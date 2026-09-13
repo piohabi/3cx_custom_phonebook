@@ -1,0 +1,40 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+*.egg-info/
+dist/
+build/
+
+# Config & Credentials
+config.json
+.fernet_key
+*.env
+*.env.local
+
+# Logs
+*.log
+logs/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Output
+/var/www/html/phonebook/
+phonebook.csv
+phonebook.xml
+
+# Temp
+*.tmp
+.tmp/
+temp/

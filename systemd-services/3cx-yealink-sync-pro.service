@@ -1,0 +1,56 @@
+[Unit]
+Description=3CX → Yealink AX Phonebook Sync Service (PRO with Web Setup)
+After=network.target
+Documentation=https://example.com/docs/3cx-yealink-sync-pro
+Wants=network-online.target
+
+[Service]
+Type=simple
+
+# Benutzer
+User=3cx_sync
+Group=3cx_sync
+
+# Arbeitsverzeichnis
+WorkingDirectory=/opt/3cx_yealink_sync
+
+# Haupt-Befehl: Daemon-Modus mit Web-Interface
+ExecStart=/usr/bin/python3 /opt/3cx_yealink_sync/3cx_yealink_sync_pro.py \
+  --daemon \
+  --config /opt/3cx_yealink_sync/config.json \
+  --port 8080 \
+  --interval 300
+
+# Restart-Verhalten
+Restart=always
+RestartSec=10
+StartLimitInterval=60s
+StartLimitBurst=3
+
+# Prozess-Handling
+KillMode=mixed
+KillSignal=SIGINT
+TimeoutStopSec=30
+
+# Umgebungsvariablen
+Environment="PYTHONUNBUFFERED=1"
+
+# Limits
+LimitNOFILE=4096
+LimitNPROC=4096
+
+# Sicherheit
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=yes
+ReadWritePaths=/var/www/html/phonebook /var/log/3cx_yealink_sync.log /opt/3cx_yealink_sync
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=3cx-yealink-sync
+StandardOutputMaxSize=10M
+
+[Install]
+WantedBy=multi-user.target
