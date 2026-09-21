@@ -1,0 +1,24 @@
+[Unit]
+Description=ProOffice 3CX Phonebook Server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/opt/prooffice-phonebook
+EnvironmentFile=/opt/prooffice-phonebook/.env
+ExecStart=/opt/prooffice-phonebook/venv/bin/python3 /opt/prooffice-phonebook/app.py
+Restart=always
+RestartSec=5
+User=prooffice-phonebook
+Group=prooffice-phonebook
+
+# Härtung — der Dienst braucht nur ausgehendes HTTPS zu 3CX und muss in sein eigenes
+# Arbeitsverzeichnis schreiben können, sonst nichts.
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/opt/prooffice-phonebook/www /opt/prooffice-phonebook/logs /opt/prooffice-phonebook/config.yml /opt/prooffice-phonebook/.env
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

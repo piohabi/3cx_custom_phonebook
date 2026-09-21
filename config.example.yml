@@ -1,0 +1,33 @@
+threecx:
+  url: "https://firma.on3cx.de"
+  username: "CHANGE_ME"
+
+sync:
+  interval: 300
+
+yealink:
+  models:
+    - AX83H
+    - AX86R
+  group_name: "3CX Kontakte"
+  number_fields:
+    - PhoneNumber
+    - Business
+    - Mobile2
+    - Business2
+    - Home
+    - Other
+    - BusinessFax
+    - Pager
+  normalize_numbers: false
+  country_code: "+49"
+  deduplicate: false
+  groups: []
+
+server:
+  listen: "0.0.0.0"
+  port: 8095
+  phonebook_path: "www/phonebook.xml"
+  allowed_ips:
+    - "127.0.0.1"
+    - "203.0.113.10"

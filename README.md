@@ -1,345 +1,99 @@
-# 3CX ↔ Yealink AX Phonebook Sync
+# 3CX Custom Phonebook Server
 
-> **Automatische Kontakt-Synchronisation zwischen 3CX Telefonanlage und Yealink AX83H/AX86R Telefonen**
+Produktiv getesteter Kontaktbuch-Server für 3CX v20 und Yealink AX83H/AX86R. Der Dienst meldet sich über den 3CX WebClient-Endpunkt an, lädt Kontakte aus der XAPI und veröffentlicht sie als `YealinkIPPhoneBook`-XML.
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Python 3.7+](https://img.shields.io/badge/Python-3.7+-blue.svg)](https://www.python.org/downloads/)
+## Funktionen
 
----
+- 3CX-v20-Anmeldung und XAPI-Paginierung
+- Yealink XML mit `Name` sowie `Phone1` bis `Phone4`
+- Webportal für Konfiguration und Betriebsstatus
+- Verbindungstest und sofortige Synchronisierung
+- Dynamischer Provisionierungslink mit Kopierfunktion
+- Kontaktliste mit Suche und Seitennavigation
+- Getrennte Rohdaten- und Yealink-Vorschau
+- Einstellbare Feldpriorität und optionales Normalisieren von Rufnummern
+- Optionale Duplikatfilterung
+- Zusätzliche Telefonbuchgruppen nach 3CX-Feldern wie `Tag` oder `Department`
+- IP-Allowlist und Zugriffstoken
+- Systemd-Service mit eigenem Benutzer
+- Automatische Sicherung der Konfiguration vor Änderungen
 
-## 🎯 Übersicht
+## Voraussetzungen
 
-Dieses System synchronisiert Kontakte automatisch aus Ihrer **3CX-Telefonanlage** zu den **Yealink AX83H/AX86R Telefonen** (oder kompatible Modelle).
+- Debian 12 oder vergleichbares Linux mit systemd
+- Python 3.11+ und `python3-venv`
+- Ausgehender HTTPS-Zugriff zur 3CX-Anlage
+- Ein 3CX-Benutzer mit Leserechten für Kontakte
+- Eingehender TCP-Port 8095 nur von den benötigten Standorten
 
-### Besonderheiten:
-
-✅ **Automatische Synchronisation** – Alle 5 Minuten (konfigurierbar)  
-✅ **Zwei Versionen** – STANDARD (CSV) oder PRO (Web-Setup + REST API)  
-✅ **Alle 4 Nummernfelder** – Office, Mobile, Other, Fax  
-✅ **Einfache Installation** – Quick-Start in 5-15 Minuten  
-✅ **Produktionsreif** – Mit Error-Handling und Logging  
-✅ **Open Source** – MIT-Lizenz
-
----
-
-## 🚀 Quick Start
-
-### OPTION A: PRO-Version (Empfohlen für Anfänger)
+## Installation
 
 ```bash
-# 1. Repository klonen
 git clone https://github.com/piohabi/3cx_custom_phonebook.git
 cd 3cx_custom_phonebook
-
-# 2. Installation
-sudo cp 3cx_yealink_sync_pro.py /opt/3cx_yealink_sync/
-cd /opt/3cx_yealink_sync
-python3 3cx_yealink_sync_pro.py --setup
-
-# 3. Browser öffnen
-# http://localhost:8080
-# Formular ausfüllen (FQDN, Extension, Passwort)
-# Speichern & fertig!
+sudo apt-get update
+sudo apt-get install -y python3 python3-venv
+sudo ./install.sh
 ```
 
-**Zeitaufwand:** 5-10 Minuten  
-**Dokumetation:** Siehe `docs/PRO_QUICKSTART.md`
+Danach `http://SERVER:8095` öffnen. Beim ersten Start müssen 3CX-URL, Benutzername und Passwort eingetragen werden. `install.sh` erzeugt automatisch einen zufälligen Zugriffstoken.
 
----
+## Konfiguration
 
-### OPTION B: STANDARD-Version (CSV-basiert)
+Die produktive Konfiguration liegt außerhalb des Repositorys:
+
+```text
+/opt/prooffice-phonebook/config.yml
+/opt/prooffice-phonebook/.env
+```
+
+Als Vorlage dient [`config.example.yml`](config.example.yml). Zugangsdaten und Zugriffstoken gehören ausschließlich in `.env` und werden durch `.gitignore` ausgeschlossen.
+
+Im Portal lassen sich Seitentitel, Synchronisationsintervall, Yealink-Gruppenname, Feldpriorität, Rufnummernnormalisierung, Duplikatfilterung und zusätzliche Telefonbuchgruppen konfigurieren. Gruppen verwenden das Format `Name|3CX-Feld|Suchwert`.
+
+## Provisionierung
+
+Das Portal erzeugt den vollständigen Link automatisch:
+
+```text
+http://SERVER:8095/phonebook.xml?key=ZUGRIFFSTOKEN
+```
+
+Zusätzliche Telefonbuchgruppen erhalten eigene Links. AX83H und AX86R verwenden dasselbe `YealinkIPPhoneBook`-Schema.
+
+## Betrieb und Updates
 
 ```bash
-# 1. Repository klonen
-git clone https://github.com/piohabi/3cx_custom_phonebook.git
-cd 3cx_custom_phonebook
-
-# 2. Installation
-sudo cp 3cx_yealink_sync.py /opt/3cx_yealink_sync/
-python3 3cx_yealink_sync.py \
-  --input /var/lib/3cx/phonebook/contacts_3cx.csv \
-  --output /var/www/html/phonebook \
-  --daemon
-
-# 3. Systemd-Service installieren
-sudo cp systemd-services/3cx-yealink-sync.service /etc/systemd/system/
-sudo systemctl daemon-reload
-sudo systemctl enable --now 3cx-yealink-sync.service
+sudo systemctl status prooffice-phonebook
+sudo journalctl -u prooffice-phonebook -f
+curl http://127.0.0.1:8095/status.json
 ```
 
-**Zeitaufwand:** 10-15 Minuten  
-**Dokumentation:** Siehe `docs/QUICK_START.md`
-
----
-
-## 📋 Anforderungen
-
-### System:
-- **Linux** (Debian 11+, Ubuntu 20.04+, CentOS 8+)
-- **Python 3.7+**
-- **pip** für Abhängigkeiten
-
-### 3CX:
-- **3CX v16+** mit REST API (Standard)
-- **Admin-Extension** oder Systemeigentümer-Zugang
-
-### Yealink:
-- **AX83H** oder **AX86R** (oder kompatible Modelle)
-- Netzwerk-Erreichbarkeit zum Sync-Server
-
----
-
-## 📦 Repository-Struktur
-
-```
-3cx_custom_phonebook/
-├── README.md                           ← Sie sind hier
-├── .gitignore
-├── LICENSE
-│
-├── 3cx_yealink_sync.py                 ← STANDARD Version (CSV)
-├── 3cx_yealink_sync_pro.py             ← PRO Version (Web + API)
-├── test_3cx_yealink_sync.sh            ← Test-Skript
-│
-├── docs/
-│   ├── README_STANDARD.md              ← Feature-Übersicht STANDARD
-│   ├── README_PRO.md                   ← Feature-Übersicht PRO
-│   ├── QUICK_START.md                  ← Schnelleinstieg STANDARD
-│   ├── PRO_QUICKSTART.md               ← Schnelleinstieg PRO
-│   ├── INSTALLATIONSANLEITUNG.md       ← Detaillierte Anleitung
-│   └── ...
-│
-├── systemd-services/
-│   ├── 3cx-yealink-sync.service        ← Service STANDARD
-│   └── 3cx-yealink-sync-pro.service    ← Service PRO
-│
-└── examples/
-    └── (Konfigurationsbeispiele)
-```
-
----
-
-## 🎯 Welche Version?
-
-| Aspekt | STANDARD | PRO |
-|--------|----------|-----|
-| **Datenquelle** | 3CX CSV-Export | 3CX REST API |
-| **Konfiguration** | Kommandozeile | Web-Browser |
-| **Setup-Zeit** | 15 Min | 5 Min |
-| **Anfänger-freundlich** | ⭐⭐ | ⭐⭐⭐⭐⭐ |
-| **Für wen?** | Tech-Admins | Alle |
-
-→ **Empfehlung:** Starten Sie mit **PRO-Version** für einfache Installation!
-
----
-
-## 📚 Dokumentation
-
-### Schnelleinstieg:
-- **[PRO_QUICKSTART.md](docs/PRO_QUICKSTART.md)** – 5-Minuten-Setup (PRO)
-- **[QUICK_START.md](docs/QUICK_START.md)** – 10-Minuten-Setup (STANDARD)
-
-### Detailliert:
-- **[README_PRO.md](docs/README_PRO.md)** – Features & Vergleich
-- **[INSTALLATIONSANLEITUNG.md](docs/INSTALLATIONSANLEITUNG.md)** – Ausführliche Docs
-
-### Support:
-- **[test_3cx_yealink_sync.sh](test_3cx_yealink_sync.sh)** – Diagnose-Skript
-
----
-
-## 🔧 Installation vom Server aus
-
-### Methode 1: Git Clone (empfohlen)
+Ein Update überschreibt weder `config.yml` noch `.env`:
 
 ```bash
-# Auf Linux-Server als root
-cd /tmp
-git clone https://github.com/piohabi/3cx_custom_phonebook.git
-cd 3cx_custom_phonebook
-
-# PRO-Version installieren
-sudo mkdir -p /opt/3cx_yealink_sync
-sudo cp 3cx_yealink_sync_pro.py /opt/3cx_yealink_sync/
-sudo chmod +x /opt/3cx_yealink_sync/3cx_yealink_sync_pro.py
-
-# Starten
-cd /opt/3cx_yealink_sync
-python3 3cx_yealink_sync_pro.py --setup --port 8080
-
-# Browser: http://localhost:8080
+cd /pfad/zu/3cx_custom_phonebook
+git pull --ff-only
+sudo ./install.sh
 ```
 
-### Methode 2: Einzelne Skripte herunterladen
+Die Quellversion im Repository ist die maßgebliche Version. Änderungen werden zuerst hier committed und danach mit `sudo ./install.sh` ausgerollt. Kundenspezifische Konfiguration, Passwörter, Tokens, erzeugte Telefonbücher und Logs werden nicht committed.
+
+Vor einem Release:
 
 ```bash
-# Nur das Haupt-Skript
-curl -O https://raw.githubusercontent.com/piohabi/3cx_custom_phonebook/master/3cx_yealink_sync_pro.py
-chmod +x 3cx_yealink_sync_pro.py
-python3 3cx_yealink_sync_pro.py --setup
+python3 -m py_compile app.py
+shellcheck install.sh
 ```
 
----
+## Bestehende ältere Versionen
 
-## 🎛️ Konfiguration
+`3cx_yealink_sync.py` und `3cx_yealink_sync_pro.py` stammen aus der früheren CSV/REST-Implementierung. Für neue Installationen ist ausschließlich `app.py` mit `prooffice-phonebook.service` vorgesehen.
 
-### PRO-Version: Web-Interface
+## Sicherheit
 
-```
-Browser öffnen: http://localhost:8080
-├─ FQDN eingeben (z.B. 3cx.example.com)
-├─ Extension eingeben (z.B. 101)
-├─ Passwort eingeben
-├─ "Verbindung testen" klicken
-└─ "Speichern & Starten" klicken
-```
+Portal und Telefonbuch dürfen nur für ausdrücklich freigegebene Quell-IP-Adressen erreichbar sein. Das Portal verwendet derzeit HTTP; Zugangsdaten sollten über einen privaten Netzwerkpfad oder SSH-Tunnel eingegeben werden, bis die geplante HTTPS-/VPN-Trennung umgesetzt ist.
 
-### STANDARD-Version: Kommandozeile
+## Lizenz
 
-```bash
-python3 3cx_yealink_sync.py \
-  --input /var/lib/3cx/phonebook/contacts_3cx.csv \
-  --output /var/www/html/phonebook \
-  --interval 300 \
-  --port 8080 \
-  --daemon
-```
-
----
-
-## 📱 Telefone konfigurieren
-
-### Auf Yealink AX83H/AX86R:
-
-1. Admin-Interface öffnen: `http://<TELEFON_IP>`
-2. **Directory** → **Local Phonebook**
-3. **Remote Phonebook URL:**
-   ```
-   http://<SERVER_IP>:8080/phonebook.csv
-   ```
-4. **Refresh Interval:** `3600` (1 Stunde)
-5. **Save** → **Reboot**
-
-### Über 3CX-Provisioning (automatisch):
-
-```
-3CX Admin Console
-  → Hardware Phones
-    → Phone Templates
-      → AX83H
-        → Remote Phonebook URL: http://<SERVER_IP>:8080/phonebook.csv
-        → Save
-```
-
----
-
-## 🧪 Testen
-
-### Test-Skript ausführen
-
-```bash
-chmod +x test_3cx_yealink_sync.sh
-./test_3cx_yealink_sync.sh
-```
-
-Prüft automatisch:
-- ✓ Python-Installation
-- ✓ Dateien & Berechtigungen
-- ✓ Service-Status
-- ✓ HTTP-Server
-- ✓ Ausgabedateien
-
----
-
-## 🐛 Troubleshooting
-
-### "Verbindung fehlgeschlagen"
-
-```bash
-# 3CX erreichbar?
-ping 3cx.example.com
-
-# REST API funktioniert?
-curl -k https://3cx.example.com/api/v1/ping
-
-# Logs prüfen
-sudo journalctl -u 3cx-yealink-sync-pro.service -n 50
-```
-
-### "Telefone zeigen keine Kontakte"
-
-```bash
-# HTTP-Server läuft?
-curl http://localhost:8080/phonebook.csv
-
-# Kontakte vorhanden?
-wc -l /var/www/html/phonebook/phonebook.csv
-
-# Service läuft?
-sudo systemctl status 3cx-yealink-sync-pro.service
-```
-
-Weitere Lösungen: Siehe `docs/INSTALLATIONSANLEITUNG.md`
-
----
-
-## 📊 Feldmapping
-
-Die **4 Yealink-Nummernfelder** werden intelligent aus 3CX gefüllt:
-
-| Yealink-Feld | 3CX-Quelle (primär) | Fallback |
-|---|---|---|
-| **Office** | Business | Business2 |
-| **Mobile** | Mobile | – |
-| **Other** | Mobile2 | Home |
-| **Fax** | BusinessFax | Other |
-
----
-
-## 🔐 Sicherheit
-
-✅ **Passwort-Verschlüsselung** – AES (Fernet, PRO-Version)  
-✅ **HTTPS zu 3CX** – Sichere REST API-Verbindung  
-✅ **Benutzer-Isolation** – Service läuft als `3cx_sync` (kein root)  
-✅ **Self-Signed Certs OK** – Funktioniert mit 3CX-Standardzertifikaten
-
----
-
-## 📄 Lizenz
-
-MIT License – Siehe [LICENSE](LICENSE)
-
----
-
-## 🤝 Beiträge
-
-Fehler gefunden? Feature-Request?
-
-→ [Issues erstellen](https://github.com/piohabi/3cx_custom_phonebook/issues)
-
----
-
-## 📞 Support
-
-### Ressourcen:
-- 📖 [Dokumentation](docs/)
-- 🐛 [Issues & Bugs](https://github.com/piohabi/3cx_custom_phonebook/issues)
-- 💬 [Diskussionen](https://github.com/piohabi/3cx_custom_phonebook/discussions)
-
-### Schnelle Hilfe:
-```bash
-python3 3cx_yealink_sync.py --help
-python3 3cx_yealink_sync_pro.py --help
-```
-
----
-
-## 🎉 Danke!
-
-Viel Erfolg bei der Einrichtung! 🚀
-
----
-
-**Version:** 2.0  
-**Zuletzt aktualisiert:** 2026-09-13  
-**Für:** 3CX + Yealink AX83H/AX86R auf Linux
+MIT – siehe [`LICENSE`](LICENSE).

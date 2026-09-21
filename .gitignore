@@ -13,6 +13,7 @@ build/
 
 # Config & Credentials
 config.json
+config.yml
 .fernet_key
 *.env
 *.env.local
@@ -20,6 +21,7 @@ config.json
 # Logs
 *.log
 logs/
+www/
 
 # IDE
 .vscode/
