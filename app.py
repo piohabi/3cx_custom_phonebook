@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """ProOffice 3CX Phonebook Server — pulls company contacts from a 3CX PBX via XAPI and
-publishes a Yealink Remote Phone Book XML (Phone1..Phone4 per contact) at a fixed URL.
+publishes the 3CX-compatible Yealink AX remote-directory XML at a fixed URL.
 
 Field names below are confirmed live 2026-08-30 against pro-office-test.on3cx.de (PBX
 20.0.9.995): logged in via the same WebClient endpoint 3CX's own web client uses, fetched
@@ -173,13 +173,18 @@ def prepare_contacts(contacts, settings):
 
 
 def build_yealink_xml(contacts, group_name, settings=None):
-    """YealinkIPPhoneBook — das Remote-Phone-Book-Format aus Yealinks Auto-Provisioning-
-    Guide (identisches Schema für AX83H/AX86R wie für alle aktuellen Yealink-SIP-Telefone/
-    DECT-Basisstationen). Bis zu 4 Nummern pro <Unit> (Phone1..Phone4) — deckt reale 3CX-
-    Contacts-Daten ab, da ein Contact-Datensatz höchstens 8 nummernartige Felder hat und die
-    meisten davon unbelegt sind (siehe contact_numbers()'s Doc zur Prioritätsreihenfolge,
-    falls doch mehr als 4 belegt sind)."""
-    lines = ['<?xml version="1.0" encoding="UTF-8"?>', "<YealinkIPPhoneBook>", f"<Menu><Name>{escape(group_name)}</Name>"]
+    """Erzeugt das von 3CX für Yealink AX83H/AX86R bereitgestellte Verzeichnisformat.
+
+    Die Geräte erwarten pro Rufnummer einen DirectoryEntry mit Name und Telephone. Das
+    alternative YealinkIPPhoneBook-Schema mit Phone1..Phone4 zeigt auf diesen AX-Modellen
+    zwar den Namen an, übernimmt die Rufnummern jedoch nicht zuverlässig.
+    """
+    lines = [
+        '<?xml version="1.0" encoding="utf-8"?>',
+        '<XXXIPPhoneDirectory clearlight="true">',
+        f"<Title>{escape(group_name)}</Title>",
+        "<Prompt>Prompt</Prompt>",
+    ]
     skipped = 0
     settings = settings or {}
     for contact in prepare_contacts(contacts, settings):
@@ -188,13 +193,12 @@ def build_yealink_xml(contacts, group_name, settings=None):
             skipped += 1
             continue
         name = escape(contact_display_name(contact))
-        lines.append("<Unit>")
-        lines.append(f"<Name>{name}</Name>")
-        for i in range(4):
-            lines.append(f"<Phone{i + 1}>{escape(numbers[i]) if i < len(numbers) else ''}</Phone{i + 1}>")
-        lines.append("</Unit>")
-    lines.append("</Menu>")
-    lines.append("</YealinkIPPhoneBook>")
+        for number in numbers:
+            lines.append("<DirectoryEntry>")
+            lines.append(f"<Name>{name}</Name>")
+            lines.append(f"<Telephone>{escape(number)}</Telephone>")
+            lines.append("</DirectoryEntry>")
+    lines.append("</XXXIPPhoneDirectory>")
     if skipped:
         log.info("%d Kontakt(e) ohne jede Rufnummer übersprungen", skipped)
     return "\n".join(lines)
@@ -540,7 +544,7 @@ button{{margin-top:24px;padding:11px 18px;background:#1769aa;color:white;border:
 <label for="page-title">Titel der Seite</label><input id="page-title" name="page_title" value="{page_title}" placeholder="{html.escape(pbx_host)} - Kontaktbuch">
 <label for="sync-interval">Synchronisationsintervall (Sekunden)</label><input id="sync-interval" name="sync_interval" type="number" min="30" value="{int(sync_cfg.get('interval', 300))}">
 <label for="group-name">Yealink-Gruppenname</label><input id="group-name" name="group_name" value="{html.escape(str(yealink_cfg.get('group_name', '3CX Kontakte')), quote=True)}">
-<label for="number-fields">Rufnummernfelder in Prioritätsreihenfolge</label><input id="number-fields" name="number_fields" value="{number_fields_value}"><p class="hint">Kommagetrennt; maximal vier gefüllte Felder werden als Phone1 bis Phone4 ausgegeben.</p>
+<label for="number-fields">Rufnummernfelder in Prioritätsreihenfolge</label><input id="number-fields" name="number_fields" value="{number_fields_value}"><p class="hint">Kommagetrennt; maximal vier gefüllte Felder werden als einzelne Name/Telephone-Einträge ausgegeben.</p>
 <label><input style="width:auto" type="checkbox" name="normalize_numbers" value="yes"{normalize_checked}> Rufnummern normalisieren</label>
 <label for="country-code">Ländervorwahl für führende Null</label><input id="country-code" name="country_code" value="{html.escape(str(yealink_cfg.get('country_code', '+49')), quote=True)}">
 <label><input style="width:auto" type="checkbox" name="deduplicate" value="yes"{deduplicate_checked}> Identische Kontakte in der Yealink-Ausgabe entfernen</label>
@@ -597,12 +601,12 @@ async function runAction(url){{const r=document.getElementById('action-result');
             rows = []
             for contact in contacts:
                 numbers = contact_numbers(contact, cfg.get("yealink", {}))
-                cells = "".join(f"<td>{html.escape(numbers[i]) if i < len(numbers) else ''}</td>" for i in range(4))
-                rows.append(f"<tr><td>{html.escape(contact_display_name(contact))}</td>{cells}</tr>")
-            content = "".join(rows) or '<tr><td colspan="5">Noch keine Kontakte geladen.</td></tr>'
+                for number in numbers:
+                    rows.append(f"<tr><td>{html.escape(contact_display_name(contact))}</td><td>{html.escape(number)}</td></tr>")
+            content = "".join(rows) or '<tr><td colspan="2">Noch keine Kontakte geladen.</td></tr>'
             key = urllib.parse.quote(access_token, safe="")
             page = f"""<!doctype html><html lang="de"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>{html.escape(title)} – Yealink</title><style>body{{font-family:system-ui,sans-serif;background:#f4f6f8;color:#18212b;margin:0;padding:32px 16px}}main{{max-width:1100px;margin:auto;background:#fff;padding:28px;border-radius:12px;box-shadow:0 4px 22px #0002}}table{{width:100%;border-collapse:collapse}}th,td{{padding:10px;text-align:left;border-bottom:1px solid #d8dde2}}a{{color:#1769aa}}</style></head>
-<body><main><h1>Yealink-Vorschau AX83H / AX86R</h1><p>{len(contacts)} Kontakt(e) als Name und Phone1 bis Phone4</p><p><a href="/admin?key={key}">← Zur Konfiguration</a></p><table><thead><tr><th>Name</th><th>Phone1</th><th>Phone2</th><th>Phone3</th><th>Phone4</th></tr></thead><tbody>{content}</tbody></table></main></body></html>"""
+<body><main><h1>Yealink-Vorschau AX83H / AX86R</h1><p>{len(rows)} Verzeichniseinträge im 3CX-kompatiblen Format</p><p><a href="/admin?key={key}">← Zur Konfiguration</a></p><table><thead><tr><th>Name</th><th>Telephone</th></tr></thead><tbody>{content}</tbody></table></main></body></html>"""
             self._send_html(page)
 
         def _serve_raw_contacts(self, parsed):

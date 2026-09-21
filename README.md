@@ -5,7 +5,7 @@ Produktiv getesteter Kontaktbuch-Server für 3CX v20 und Yealink AX83H/AX86R. De
 ## Funktionen
 
 - 3CX-v20-Anmeldung und XAPI-Paginierung
-- Yealink XML mit `Name` sowie `Phone1` bis `Phone4`
+- 3CX-kompatible Yealink-AX-XML mit `DirectoryEntry`, `Name` und `Telephone`
 - Webportal für Konfiguration und Betriebsstatus
 - Verbindungstest und sofortige Synchronisierung
 - Dynamischer Provisionierungslink mit Kopierfunktion
@@ -59,7 +59,7 @@ Das Portal erzeugt den vollständigen Link automatisch:
 http://SERVER:8095/phonebook.xml?key=ZUGRIFFSTOKEN
 ```
 
-Zusätzliche Telefonbuchgruppen erhalten eigene Links. AX83H und AX86R verwenden dasselbe `YealinkIPPhoneBook`-Schema.
+Zusätzliche Telefonbuchgruppen erhalten eigene Links. AX83H und AX86R verwenden das von 3CX bereitgestellte Schema `XXXIPPhoneDirectory`; jede Rufnummer wird als eigener `DirectoryEntry` mit `Name` und `Telephone` ausgegeben.
 
 ## Betrieb und Updates
 
